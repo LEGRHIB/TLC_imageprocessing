@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from skimage.filters import threshold_otsu
 
 # Load the image
-image_path = '/Users/YoucefLeghrib/Desktop/download.png'  # Ensure this is the correct path
+image_path = './images/TLC1.png'  # Ensure this is the correct path
 image = cv2.imread(image_path)
 
 # Convert the image to the HSV color space
