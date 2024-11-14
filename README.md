@@ -3,7 +3,7 @@ This project automates TLC analysis by capturing and processing TLC plate images
 # Project Description
 This project aims to automate the TLC (Thin Layer Chromatography) process by enhancing image capture and data analysis. The primary goal is to reduce manual tasks, improve accuracy, and streamline the workflow by automating key steps, including capturing TLC images under UV light, measuring the distance of sample spots, and storing results in a Manufacturing Execution System (MES). We aim to create a system that is efficient and reliable for lab environments.
 ## Short term
-## Annotate.py Usage Instructions
+## uvclick.py Usage Instructions
 
 This application provides an interactive interface for annotating TLC images and calculating spot-to-baseline ratios. It is designed to simplify the process for operators by allowing them to pick key points on the image, with the application handling pixel-based ratio calculations.
 
