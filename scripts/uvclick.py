@@ -1,67 +1,68 @@
 import cv2
 import numpy as np
 
-# Global variables to store points for multiple plates
-plates = []  # List to hold plates (each plate is a dictionary with 'baseline', 'solvent_line', and 'spots')
-current_plate = {"baseline": None, "solvent_line": None, "spots": []}  # Temp storage for the current plate
+# Global variables to store clicked points
+annotations = []
+current_plate = None
+current_annotation_type = None
 
-# Mouse callback function
+# Color mapping for annotation types
+annotation_colors = {
+    "baseline": (0, 0, 255),       # Red for baseline
+    "solvent_line": (255, 0, 0),   # Blue for solvent line
+    "spots": (0, 255, 0)           # Green for spots
+}
+
+# Mouse callback function to capture points
 def click_event(event, x, y, flags, param):
-    global plates, current_plate
-    image = param
+    global current_plate, current_annotation_type, annotations
 
-    if event == cv2.EVENT_LBUTTONDOWN:  # Left click for points
-        print(f"Point selected: {x}, {y}")
-        if current_plate["baseline"] is None:
-            current_plate["baseline"] = (x, y)
-            print("Baseline selected.")
-            cv2.circle(image, (x, y), 5, (0, 0, 255), -1)  # Red for baseline
-        elif current_plate["solvent_line"] is None:
-            current_plate["solvent_line"] = (x, y)
-            print("Solvent line selected.")
-            cv2.circle(image, (x, y), 5, (255, 0, 0), -1)  # Blue for solvent line
-        else:
-            current_plate["spots"].append((x, y))
-            print(f"Spot selected ({len(current_plate['spots'])}): {x}, {y}")
-            cv2.circle(image, (x, y), 5, (0, 255, 0), -1)  # Green for spots
+    if event == cv2.EVENT_LBUTTONDOWN:  # Left click to select points
+        if current_plate is not None and current_annotation_type:
+            current_plate[current_annotation_type].append((x, y))
+            print(f"{current_annotation_type} point selected for Plate {len(annotations)}: ({x}, {y})")
 
-        cv2.imshow("Image", image)
+            # Get the color for the current annotation type
+            color = annotation_colors.get(current_annotation_type, (255, 255, 255))  # Default to white
 
-    elif event == cv2.EVENT_RBUTTONDOWN:  # Right click to finalize a plate
-        print("Finalizing current plate.")
-        plates.append(current_plate)
-        current_plate = {"baseline": None, "solvent_line": None, "spots": []}
-        print(f"Total plates defined so far: {len(plates)}")
+            # Draw a small circle with the specified color
+            cv2.circle(param, (x, y), 2, color, -1)  # Circle radius set to 2
+            cv2.imshow("Image", param)
 
-def calculate_ratios(plates):
-    ratios = []
-    for plate in plates:
-        baseline = plate["baseline"]
-        solvent_line = plate["solvent_line"]
-        spots = plate["spots"]
 
-        if baseline is None or solvent_line is None or len(spots) == 0:
-            print("Incomplete data for one plate. Skipping...")
+def calculate_ratios(annotations):
+    results = []
+
+    for i, plate in enumerate(annotations):
+        baseline = plate.get("baseline")
+        solvent_line = plate.get("solvent_line")
+        spots = plate.get("spots", [])
+
+        if not baseline or not solvent_line:
+            print(f"Error: Plate {i + 1} is missing baseline or solvent line.")
             continue
 
-        # Calculate solvent line to baseline distance
-        solvent_to_baseline = np.linalg.norm(np.array(solvent_line) - np.array(baseline))
-        if solvent_to_baseline == 0:
-            print("Error: Solvent to baseline distance is zero. Skipping...")
-            continue
+        plate_results = {"spots": []}
 
-        # Calculate each spot's ratio
-        plate_ratios = []
+        # Calculate distances and ratios for each spot
         for spot in spots:
-            spot_to_baseline = np.linalg.norm(np.array(spot) - np.array(baseline))
-            ratio = spot_to_baseline / solvent_to_baseline
-            plate_ratios.append(ratio)
+            spot_to_baseline = np.linalg.norm(np.array(spot) - np.array(baseline[0]))
+            solvent_to_baseline = np.linalg.norm(np.array(solvent_line[0]) - np.array(baseline[0]))
 
-        ratios.append(plate_ratios)
-    return ratios
+            if solvent_to_baseline == 0:
+                print(f"Error: Solvent to baseline distance is zero for Plate {i + 1}.")
+                continue
+
+            ratio = spot_to_baseline / solvent_to_baseline
+            plate_results["spots"].append({"spot": spot, "ratio": ratio})
+
+        results.append(plate_results)
+
+    return results
+
 
 def main():
-    global plates, current_plate
+    global current_plate, current_annotation_type, annotations
 
     # Load the image
     image_path = "./sorted_images/uv/100917.jpg"  # Replace with your image path
@@ -70,32 +71,61 @@ def main():
         print(f"Error: Could not load image at {image_path}")
         return
 
-    # Clone the image to redraw without losing original
+    # Clone the image to redraw without losing the original
     clone = image.copy()
 
+    # Instructions
+    print("Instructions:")
+    print("1. Press 'n' to start a new plate.")
+    print("2. Press 'b' to annotate baseline for the current plate.")
+    print("3. Press 's' to annotate solvent line for the current plate.")
+    print("4. Press 'o' to annotate spots for the current plate.")
+    print("5. Press 'q' to finish and calculate ratios.")
+
     # Display the image and set up the mouse callback
-    cv2.imshow("Image", clone)
+    cv2.imshow("Image", image)
     cv2.setMouseCallback("Image", click_event, param=clone)
 
-    print("Instructions:")
-    print("1. Left-click to select baseline, solvent line, and spots for a plate.")
-    print("2. Right-click to finalize the plate and move to the next one.")
-    print("3. Press 'q' to finish.")
+    while True:
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('q'):  # Quit
+            break
+        elif key == ord('n'):  # Start a new plate
+            current_plate = {"baseline": [], "solvent_line": [], "spots": []}
+            annotations.append(current_plate)
+            print(f"Started annotating Plate {len(annotations)}.")
+        elif key == ord('b'):  # Annotate baseline
+            if current_plate:
+                current_annotation_type = "baseline"
+                print(f"Annotating baseline for Plate {len(annotations)}. Click on the baseline.")
+            else:
+                print("Error: Start a plate first ('n').")
+        elif key == ord('s'):  # Annotate solvent line
+            if current_plate:
+                current_annotation_type = "solvent_line"
+                print(f"Annotating solvent line for Plate {len(annotations)}. Click on the solvent line.")
+            else:
+                print("Error: Start a plate first ('n').")
+        elif key == ord('o'):  # Annotate spots
+            if current_plate:
+                current_annotation_type = "spots"
+                print(f"Annotating spots for Plate {len(annotations)}. Click on spots.")
+            else:
+                print("Error: Start a plate first ('n').")
 
-    # Wait for user to complete
-    cv2.waitKey(0)
-
-    # Calculate ratios for all plates
-    ratios = calculate_ratios(plates)
-
-    # Print results
-    for i, plate_ratios in enumerate(ratios):
-        print(f"Plate {i + 1} Ratios:")
-        for j, ratio in enumerate(plate_ratios):
-            print(f"  Spot {j + 1}: {ratio:.2f}")
+    # Calculate and display ratios
+    results = calculate_ratios(annotations)
+    if results:
+        for i, plate_data in enumerate(results):
+            print(f"\nPlate {i + 1}:")
+            print(f"  Baseline: {annotations[i]['baseline']}")
+            print(f"  Solvent Line: {annotations[i]['solvent_line']}")
+            for spot_data in plate_data["spots"]:
+                print(f"  Spot: {spot_data['spot']}, Ratio: {spot_data['ratio']:.2f}")
 
     # Clean up
     cv2.destroyAllWindows()
+
 
 if __name__ == "__main__":
     main()
