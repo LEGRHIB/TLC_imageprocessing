@@ -12,6 +12,9 @@ plate_names = ["A: 50% DCM in Heptane",
                "E: EtOAc", 
                "F: 10% MeOH in DCM"]
 
+# Conversion factor (pixels to cm)
+pixels_to_cm = 0.046  # Adjust based on your system's calibration
+
 # Color mapping for annotation types
 annotation_colors = {
     "baseline": (0, 0, 255),       # Red for baseline
@@ -32,7 +35,7 @@ def click_event(event, x, y, flags, param):
             color = annotation_colors.get(current_annotation_type, (255, 255, 255))  # Default to white
 
             # Draw a small circle with the specified color
-            cv2.circle(param, (x, y), 2, color, -1)  # Circle radius set to 2
+            cv2.circle(param, (x, y), 2, color, -1)  
             cv2.imshow("Image", param)
 
 def calculate_ratios(annotations):
@@ -47,24 +50,37 @@ def calculate_ratios(annotations):
             print(f"Error: Plate {i + 1} is missing baseline or solvent line.")
             continue
 
-        plate_results = {"spots": []}
+        plate_results = {"components": [], "solvent_front_distance_cm": 0}
 
         # Extract the y-coordinates of the baseline and solvent line
         baseline_y = baseline[0][1]  # Use the y-coordinate of the baseline point
         solvent_y = solvent_line[0][1]  # Use the y-coordinate of the solvent line point
 
-        # Calculate distances and ratios for each spot
-        for j, spot in enumerate(spots):
-            spot_y = spot[1]  # Use the y-coordinate of the spot
-            spot_to_baseline = abs(spot_y - baseline_y)  # Vertical distance from baseline
-            solvent_to_baseline = abs(solvent_y - baseline_y)  # Vertical distance from baseline to solvent line
+        # Calculate solvent front distance in cm
+        solvent_front_distance_px = abs(solvent_y - baseline_y)
+        solvent_front_distance_cm = solvent_front_distance_px * pixels_to_cm
+        plate_results["solvent_front_distance_cm"] = round(solvent_front_distance_cm, 1)
 
-            if solvent_to_baseline == 0:
+        # Calculate distances and CV (1/Rf) for each spot
+        for j, spot in enumerate(sorted(spots, key=lambda s: s[1])):  # Sort by y-coordinate
+            spot_y = spot[1]  # Use the y-coordinate of the spot
+            spot_to_baseline_px = abs(spot_y - baseline_y)  # Vertical distance from baseline
+            spot_distance_cm = spot_to_baseline_px * pixels_to_cm
+
+            if solvent_front_distance_px == 0:
                 print(f"Error: Solvent to baseline distance is zero for Plate {i + 1}.")
                 continue
 
-            ratio = spot_to_baseline / solvent_to_baseline
-            plate_results["spots"].append({"spot": f"Spot {j + 1}", "ratio": ratio})
+            rf = spot_to_baseline_px / solvent_front_distance_px
+            cv = 1 / rf if rf != 0 else 0  # CV = 1/Rf
+
+            # Append component details
+            plate_results["components"].append({
+                "component": f"Component {j + 1}",
+                "distance_cm": round(spot_distance_cm, 1),
+                "rf": round(rf, 2),
+                "cv": round(cv, 1)
+            })
 
         results.append(plate_results)
 
@@ -74,7 +90,7 @@ def main():
     global current_plate, current_annotation_type, annotations
 
     # Load the image
-    image_path = "./sorted_images/uv/100917.jpg"  # Replace with your image path
+    image_path = "./sorted_images/uv/102038UV.jpg"  # Replace with your image path
     image = cv2.imread(image_path)
     if image is None:
         print(f"Error: Could not load image at {image_path}")
@@ -92,6 +108,7 @@ def main():
     print("5. Press 'q' to finish and calculate ratios.")
 
     # Display the image and set up the mouse callback
+    cv2.startWindowThread()
     cv2.imshow("Image", image)
     cv2.setMouseCallback("Image", click_event, param=clone)
 
@@ -132,10 +149,9 @@ def main():
     if results:
         for i, plate_data in enumerate(results):
             print(f"\nPlate {plate_names[i]}:")
-            print(f"  Baseline: {annotations[i]['baseline']}")
-            print(f"  Solvent Line: {annotations[i]['solvent_line']}")
-            for spot_data in plate_data["spots"]:
-                print(f"  {spot_data['spot']}: Ratio: {spot_data['ratio']:.2f}")
+            print(f"  Solvent Front Distance: {plate_data['solvent_front_distance_cm']} cm")
+            for component_data in plate_data["components"]:
+                print(f"  {component_data['component']}: Distance: {component_data['distance_cm']} cm, Rf: {component_data['rf']}, CV: {component_data['cv']}")
 
     # Clean up
     cv2.destroyAllWindows()
