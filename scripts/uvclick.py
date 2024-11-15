@@ -13,7 +13,7 @@ plate_names = ["A: 50% DCM in Heptane",
                "F: 10% MeOH in DCM"]
 
 # Conversion factor (pixels to cm)
-pixels_to_cm = 0.046  # Adjust based on your system's calibration
+pixels_to_cm = 0.046  # Adjust based on the system's calibration
 
 # Color mapping for annotation types
 annotation_colors = {
