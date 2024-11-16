@@ -29,6 +29,22 @@ This application provides an interactive interface for annotating TLC images and
 4. **Finish Annotation**:
    - Press `q` to calculate ratios and display the results in the terminal.
 
+     ## Update Summary
+Addition of Stain Images:
+Stain images are incorporated to detect additional spots that may not be visible in UV images.
+The operator annotates baseline, solvent line, and spots for both UV and stain images.
+Integration of UV and Stain Data:
+Spots from stain images are recalibrated to align with the UV baseline and solvent line.
+UV and stain spots are combined into a single dataset for processing.
+Deduplication of Spots:
+Spots detected in both UV and stain images are automatically merged if they are within a 0.1 cm tolerance to avoid duplication.
+Automatic Component Ordering:
+All spots are sorted by their distance from the baseline.
+Components are automatically numbered in ascending order of their distance.
+Operator Workflow:
+The operator annotates UV images first, switches to stain images, and annotates any additional spots.
+The app handles deduplication, recalibration, and component ordering automatically
+
 ### Output:
 
 - The application computes the ratio of the distance from each spot to the baseline divided by the distance from the solvent line to the baseline.
